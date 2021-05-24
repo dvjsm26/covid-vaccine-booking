@@ -47,7 +47,7 @@ def viable_options(resp, minimum_slots, min_age_booking, fee_type, dose):
                         'district': center['district_name'],
                         'pincode': center['pincode'],
                         'center_id': center['center_id'],
-                        'available': availability,
+                        'available': dose_cap,
                         'date': session['date'],
                         'slots': session['slots'],
                         'session_id': session['session_id']

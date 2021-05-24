@@ -7,7 +7,7 @@ from captcha import captcha_builder
 
 BOOKING_URL = "https://cdn-api.co-vin.in/api/v2/appointment/schedule"
 BENEFICIARIES_URL = "https://cdn-api.co-vin.in/api/v2/appointment/beneficiaries"
-CALENDAR_URL_DISTRICT = "https://cdn-api.co-vin.in/api/v2/appointment/sessions/calendarByDistrict?district_id={0}&date={1}"
+CALENDAR_URL_DISTRICT = "https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id={0}&date={1}"
 CALENDAR_URL_PINCODE = "https://cdn-api.co-vin.in/api/v2/appointment/sessions/calendarByPin?pincode={0}&date={1}"
 CAPTCHA_URL = "https://cdn-api.co-vin.in/api/v2/auth/getRecaptcha"
 OTP_PUBLIC_URL = 'https://cdn-api.co-vin.in/api/v2/auth/public/generateOTP'
@@ -44,7 +44,10 @@ def viable_options(resp, minimum_slots, min_age_booking, fee_type):
     if len(resp['centers']) >= 0:
         for center in resp['centers']:
             for session in center['sessions']:
-                if (session['available_capacity'] >= minimum_slots) \
+                dose_cap = session['available_capacity']
+                if 'available_capacity_dose1' in session:
+                    dose_cap = session['available_capacity_dose1']
+                if (dose_cap >= minimum_slots) \
                         and (session['min_age_limit'] <= min_age_booking)\
                         and (center['fee_type'] in fee_type):
                     out = {
@@ -356,7 +359,7 @@ def book_appointment(request_header, details):
         beep(WARNING_BEEP_DURATION[0], WARNING_BEEP_DURATION[1])
 
 
-def check_and_book(request_header, beneficiary_dtls, location_dtls, search_option, **kwargs):
+def check_and_book(request_header, beneficiary_dtls, location_dtls, search_option, checked_sess, **kwargs):
     """
     This function
         1. Checks the vaccination calendar for available slots,
@@ -408,10 +411,18 @@ def check_and_book(request_header, beneficiary_dtls, location_dtls, search_optio
 
             display_table(cleaned_options_for_display)
             if auto_book == 'yes-please':
-                print("AUTO-BOOKING IS ENABLED. PROCEEDING WITH FIRST CENTRE, DATE, and RANDOM SLOT.")
-                option = options[0]
-                random_slot = random.randint(1, len(option['slots']))
-                choice = f'1.{random_slot}'
+                # print("AUTO-BOOKING IS ENABLED. PROCEEDING WITH FIRST CENTRE, DATE, and RANDOM SLOT.")
+                # option = options[0]
+                while True:
+                    random_opt = random.randint(1, len(options))
+                    opt = options[random_opt-1]
+                    random_slot = random.randint(1, len(opt['slots']))
+                    dict_key = opt['session_id']
+                    if random_slot not in checked_sess[dict_key]:
+                        checked_sess[dict_key].append(random_slot)
+                        break
+
+                choice = f'{random_opt}.{random_slot}'
             else:
                 choice = inputimeout(
                     prompt='----------> Wait 20 seconds for updated options OR \n----------> Enter a choice e.g: 1.4 for (1st center 4th slot): ',
@@ -446,7 +457,7 @@ def check_and_book(request_header, beneficiary_dtls, location_dtls, search_optio
                     'slot'      : options[choice[0] - 1]['slots'][choice[1] - 1]
                 }
 
-                print(f'Booking with info: {new_req}')
+                # print(f'Booking with info: {new_req}')
                 return book_appointment(request_header, new_req)
 
             except IndexError:

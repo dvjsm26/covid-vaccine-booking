@@ -2,6 +2,7 @@
 
 import copy
 from types import SimpleNamespace
+from collections import defaultdict
 import requests, sys, argparse, os, datetime
 from utils import generate_token_OTP, check_and_book, beep, BENEFICIARIES_URL, WARNING_BEEP_DURATION, \
     display_info_dict, save_user_info, collect_user_details, get_saved_user_info, confirm_and_proceed
@@ -26,7 +27,7 @@ def main():
         if args.token:
             token = args.token
         else:
-            mobile = input("Enter the registered mobile number: ")
+            mobile = None # <enter_mobile_number>
             token = generate_token_OTP(mobile, base_request_header)
 
         request_header = copy.deepcopy(base_request_header)
@@ -60,15 +61,18 @@ def main():
             save_user_info(filename, collected_details)
             confirm_and_proceed(collected_details)
 
+        # collected_details = get_saved_user_info(filename)
         info = SimpleNamespace(**collected_details)
 
         token_valid = True
+        checked_sessions = defaultdict(list)
         while token_valid:
             request_header = copy.deepcopy(base_request_header)
             request_header["Authorization"] = f"Bearer {token}"
 
             # call function to check and book slots
             token_valid = check_and_book(request_header, info.beneficiary_dtls, info.location_dtls, info.search_option,
+                                         checked_sessions,
                                          min_slots=info.minimum_slots,
                                          ref_freq=info.refresh_freq,
                                          auto_book=info.auto_book,
